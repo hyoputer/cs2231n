@@ -274,6 +274,7 @@ class FullyConnectedNet(object):
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
         caches=[]
+        dropout_caches=[]
         cur = X
         for i in range(self.num_layers-1):
           W = self.params[f'W{i+1}']
@@ -284,6 +285,9 @@ class FullyConnectedNet(object):
             cur, cache_temp = affine_norm_relu_forward(cur, W, b, gamma, beta, self.bn_params[i], self.normalization)
           else:
             cur, cache_temp = affine_relu_forward(cur, W, b)
+          if self.use_dropout:
+            cur, dcache = dropout_forward(cur, self.dropout_param)
+            dropout_caches.append(dcache)
           caches.append(cache_temp)
 
         W = self.params[f'W{self.num_layers}']
@@ -323,6 +327,8 @@ class FullyConnectedNet(object):
         grads[f'W{self.num_layers}'] += self.reg * self.params[f'W{self.num_layers}']
         for i in range(self.num_layers-1, 0, -1):
           loss += self.reg * np.sum(self.params[f'W{i}']**2) / 2
+          if self.use_dropout:
+            cur_grad = dropout_backward(cur_grad, dropout_caches[i-1])
           if self.normalization is not None:
             cur_grad, grads[f'W{i}'], grads[f'b{i}'], grads[f'gamma{i}'], grads[f'beta{i}'] = affine_norm_relu_backward(cur_grad, caches[i-1], self.normalization)
           else:
