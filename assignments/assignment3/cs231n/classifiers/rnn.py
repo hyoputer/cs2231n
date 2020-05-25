@@ -151,7 +151,22 @@ class CaptioningRNN(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        h0, a_cache = affine_forward(features, W_proj, b_proj)
+        x, v_cache = word_embedding_forward(captions_in, W_embed)
+        if self.cell_type == "rnn":
+          h, h_cache = rnn_forward(x, h0, Wx, Wh, b)
+        else:
+          h, h_cache = lstm_forward(x, h0, Wx, Wh, b)
+        scores, s_cache = temporal_affine_forward(h, W_vocab, b_vocab)
+        loss, dx = temporal_softmax_loss(scores, captions_out, mask)
+        dx, grads["W_vocab"], grads["b_vocab"] = temporal_affine_backward(dx, s_cache)
+        if self.cell_type == "rnn":
+          dx, dh0 , grads["Wx"], grads["Wh"], grads["b"] = rnn_backward(dx, h_cache)
+        else:
+          dx, dh0 , grads["Wx"], grads["Wh"], grads["b"] = lstm_backward(dx, h_cache)
+        grads["W_embed"] = word_embedding_backward(dx, v_cache)
+        _, grads["W_proj"], grads["b_proj"] = affine_backward(dh0, a_cache)
+        
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -219,7 +234,20 @@ class CaptioningRNN(object):
         ###########################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        
+        prev_h, _ = affine_forward(features, W_proj, b_proj)
+        prev_w = np.full(N, self._start)
+        cell = 0
+        for t in range(max_length):
+          x, _ = word_embedding_forward(prev_w, W_embed)
+          if self.cell_type == "rnn":
+            next_h, _ = rnn_step_forward(x, prev_h, Wx, Wh, b)
+          elif self.cell_type == "lstm":
+            next_h, cell, _ = lstm_step_forward(x, prev_h, cell, Wx, Wh, b)
+          scores, _ = affine_forward(next_h, W_vocab, b_vocab)
+          captions[:,t] = np.argmax(scores, axis=1)
+          prev_w = captions[:, t]
+          prev_h = next_h
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
